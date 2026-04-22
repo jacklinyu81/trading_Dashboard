@@ -140,6 +140,46 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--text);min-he
 .act-btn:hover{background:var(--red-bg);color:var(--red-mid);}
 .empty-state{text-align:center;padding:3rem;color:var(--text3);font-size:13px;}
 
+
+/* Period heatmap */
+.period-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:1.125rem;margin-bottom:1.25rem;}
+.period-card h4{font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--text3);margin-bottom:1rem;}
+.period-controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:1.25rem;}
+.period-controls select,.period-controls input{background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:6px 10px;font-size:12px;font-family:'Sora',sans-serif;color:var(--text);outline:none;cursor:pointer;}
+.period-controls select:focus,.period-controls input:focus{border-color:var(--border2);}
+.period-nav{display:flex;align-items:center;gap:8px;margin-left:auto;}
+.period-nav button{background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:5px 12px;font-size:13px;cursor:pointer;color:var(--text2);transition:all 0.12s;}
+.period-nav button:hover{background:var(--bg4);}
+.period-nav .nav-title{font-size:14px;font-weight:500;color:var(--text);min-width:100px;text-align:center;font-family:'JetBrains Mono',monospace;}
+/* Calendar grid */
+.cal-wrap{overflow-x:auto;}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;min-width:560px;}
+.cal-header{text-align:center;font-size:10px;font-weight:600;letter-spacing:0.06em;color:var(--text3);padding:4px 0;text-transform:uppercase;}
+.cal-cell{background:var(--bg3);border-radius:10px;padding:8px 6px;min-height:64px;display:flex;flex-direction:column;gap:3px;border:1px solid transparent;transition:border-color 0.12s;}
+.cal-cell:hover{border-color:var(--border2);}
+.cal-cell.empty{background:transparent;border-color:transparent;}
+.cal-cell.has-trade-pos{background:#f0fdf4;border-color:#bbf7d0;}
+.cal-cell.has-trade-neg{background:#fff1f2;border-color:#fecdd3;}
+.cal-cell.today{border-color:var(--blue-mid);}
+.cal-day{font-size:12px;font-weight:500;color:var(--text2);}
+.cal-val{font-size:11px;font-family:'JetBrains Mono',monospace;font-weight:500;}
+.cal-val.pos{color:var(--green-mid);}
+.cal-val.neg{color:var(--red-mid);}
+.cal-val.zero{color:var(--text3);font-weight:400;}
+.cal-count{font-size:10px;color:var(--text3);}
+/* Bar grid for month/year view */
+.bar-grid{display:grid;gap:6px;}
+.bar-row{display:grid;grid-template-columns:80px 1fr 90px;align-items:center;gap:10px;}
+.bar-label{font-size:12px;color:var(--text2);text-align:right;}
+.bar-track{background:var(--bg3);border-radius:4px;height:28px;position:relative;overflow:hidden;}
+.bar-fill-pos{position:absolute;left:50%;top:0;height:100%;background:#bbf7d0;transition:width 0.3s;}
+.bar-fill-neg{position:absolute;right:50%;top:0;height:100%;background:#fecdd3;transition:width 0.3s;}
+.bar-center{position:absolute;left:50%;top:0;width:1px;height:100%;background:var(--border2);}
+.bar-val{font-size:12px;font-family:'JetBrains Mono',monospace;font-weight:500;text-align:right;}
+.bar-val.pos{color:var(--green-mid);}
+.bar-val.neg{color:var(--red-mid);}
+.bar-val.zero{color:var(--text3);}
+
 @media(max-width:700px){
   .stats-grid{grid-template-columns:repeat(2,1fr);}
   .metrics-grid{grid-template-columns:repeat(2,1fr);}
@@ -280,6 +320,35 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--text);min-he
     <h4>各星期績效分析（平均 R）</h4>
     <div style="position:relative;width:100%;height:200px;"><canvas id="chart-weekday"></canvas></div>
   </div>
+</div>
+
+<!-- Period Performance View -->
+<div class="period-card">
+  <h4>損益日曆 / 月視圖 / 年視圖</h4>
+  <div class="period-controls">
+    <div>
+      <label style="font-size:10px;color:var(--text3);display:block;margin-bottom:3px;letter-spacing:0.05em;text-transform:uppercase;">顯示單位</label>
+      <select id="pv-unit" onchange="renderPeriodView()">
+        <option value="day">日（月曆）</option>
+        <option value="month">月（年視圖）</option>
+        <option value="year">年（全覽）</option>
+      </select>
+    </div>
+    <div>
+      <label style="font-size:10px;color:var(--text3);display:block;margin-bottom:3px;letter-spacing:0.05em;text-transform:uppercase;">數值</label>
+      <select id="pv-metric" onchange="renderPeriodView()">
+        <option value="usd">損益 USD</option>
+        <option value="r">損益 R</option>
+        <option value="both">兩者都顯示</option>
+      </select>
+    </div>
+    <div class="period-nav">
+      <button onclick="periodNav(-1)">&#8249;</button>
+      <span class="nav-title" id="pv-title">—</span>
+      <button onclick="periodNav(1)">&#8250;</button>
+    </div>
+  </div>
+  <div class="cal-wrap" id="pv-content"></div>
 </div>
 
 <!-- Trade list -->
@@ -867,6 +936,157 @@ function getBaseFiltered() {
   });
 }
 
+
+// ── Period View ───────────────────────────────────────
+let pvCursor = { year: new Date().getFullYear(), month: new Date().getMonth() }; // 0-indexed month
+
+function periodNav(dir) {
+  const unit = document.getElementById('pv-unit').value;
+  if (unit === 'day') {
+    pvCursor.month += dir;
+    if (pvCursor.month > 11) { pvCursor.month = 0; pvCursor.year++; }
+    if (pvCursor.month < 0)  { pvCursor.month = 11; pvCursor.year--; }
+  } else if (unit === 'month') {
+    pvCursor.year += dir;
+  }
+  // year view: no nav needed but allow anyway
+  renderPeriodView();
+}
+
+function fmtVal(r, usd, metric) {
+  if (metric === 'usd') {
+    if (usd === 0) return {str:'0', cls:'zero'};
+    return {str:(usd>0?'+':'')+usd.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}), cls:usd>0?'pos':'neg'};
+  }
+  if (metric === 'r') {
+    if (r === 0) return {str:'0', cls:'zero'};
+    return {str:(r>0?'+':'')+r.toFixed(2)+'R', cls:r>0?'pos':'neg'};
+  }
+  // both
+  const usdFmt = usd===0?'0':(usd>0?'+':'')+usd.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const rFmt   = r===0?'0':(r>0?'+':'')+r.toFixed(2)+'R';
+  const cls    = usd>0?'pos':usd<0?'neg':'zero';
+  return {str: usdFmt + '<br>' + rFmt, cls};
+}
+
+function renderPeriodView() {
+  const unit   = document.getElementById('pv-unit').value;
+  const metric = document.getElementById('pv-metric').value;
+  const el     = document.getElementById('pv-content');
+  const title  = document.getElementById('pv-title');
+
+  // aggregate trade data by date key
+  const byDay = {};
+  trades.forEach(t => {
+    if (!t.date) return;
+    byDay[t.date] = byDay[t.date] || {r:0, usd:0, count:0};
+    byDay[t.date].r     += t.r;
+    byDay[t.date].usd   += t.usd;
+    byDay[t.date].count += 1;
+  });
+
+  if (unit === 'day') {
+    const y = pvCursor.year, m = pvCursor.month;
+    const monthNames = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+    title.textContent = y + '-' + String(m+1).padStart(2,'0');
+    const firstDay = new Date(y, m, 1).getDay(); // 0=Sun
+    const daysInMonth = new Date(y, m+1, 0).getDate();
+    const todayStr = new Date().toISOString().slice(0,10);
+
+    let html = '<div class="cal-grid">';
+    const dayNames = ['S','M','T','W','T','F','S'];
+    dayNames.forEach(d => { html += `<div class="cal-header">${d}</div>`; });
+    // empty cells before first day
+    for (let i=0;i<firstDay;i++) html += '<div class="cal-cell empty"></div>';
+    for (let d=1; d<=daysInMonth; d++) {
+      const key = y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+      const day = byDay[key];
+      const isToday = key === todayStr;
+      let cls = 'cal-cell';
+      if (day && day.usd > 0) cls += ' has-trade-pos';
+      else if (day && day.usd < 0) cls += ' has-trade-neg';
+      if (isToday) cls += ' today';
+      html += `<div class="${cls}">`;
+      html += `<div class="cal-day">${d}</div>`;
+      if (day) {
+        const v = fmtVal(day.r, day.usd, metric);
+        html += `<div class="cal-val ${v.cls}">${v.str}</div>`;
+        html += `<div class="cal-count">${day.count}筆</div>`;
+      } else {
+        html += `<div class="cal-val zero" style="font-size:10px;">0</div>`;
+      }
+      html += '</div>';
+    }
+    html += '</div>';
+    el.innerHTML = html;
+
+  } else if (unit === 'month') {
+    const y = pvCursor.year;
+    title.textContent = y + '年';
+    // aggregate by month
+    const byMonth = {};
+    Object.entries(byDay).forEach(([key, v]) => {
+      const ky = parseInt(key.slice(0,4));
+      if (ky !== y) return;
+      const km = key.slice(0,7); // YYYY-MM
+      byMonth[km] = byMonth[km] || {r:0, usd:0, count:0};
+      byMonth[km].r     += v.r;
+      byMonth[km].usd   += v.usd;
+      byMonth[km].count += v.count;
+    });
+    const months = Array.from({length:12},(_,i)=>y+'-'+String(i+1).padStart(2,'0'));
+    const vals = months.map(m => byMonth[m] || {r:0,usd:0,count:0});
+    renderBarGrid(el, months.map((_,i)=>(i+1)+'月'), vals, metric);
+    title.textContent = y + '年';
+
+  } else {
+    // year view
+    title.textContent = '全部';
+    document.getElementById('pv-title').textContent = '全部年份';
+    const byYear = {};
+    Object.entries(byDay).forEach(([key, v]) => {
+      const ky = key.slice(0,4);
+      byYear[ky] = byYear[ky] || {r:0, usd:0, count:0};
+      byYear[ky].r     += v.r;
+      byYear[ky].usd   += v.usd;
+      byYear[ky].count += v.count;
+    });
+    const years = Object.keys(byYear).sort();
+    if (!years.length) { el.innerHTML = '<p style="color:var(--text3);font-size:13px;text-align:center;padding:2rem;">尚無資料</p>'; return; }
+    const vals = years.map(y => byYear[y]);
+    renderBarGrid(el, years.map(y=>y+'年'), vals, metric);
+  }
+}
+
+function renderBarGrid(el, labels, vals, metric) {
+  // find max abs for scale
+  const maxUSD = Math.max(...vals.map(v=>Math.abs(v.usd)), 1);
+  const maxR   = Math.max(...vals.map(v=>Math.abs(v.r)), 1);
+  let html = '<div class="bar-grid">';
+  labels.forEach((label, i) => {
+    const v = vals[i];
+    const mainVal = metric === 'r' ? v.r : v.usd;
+    const maxMain = metric === 'r' ? maxR : maxUSD;
+    const pct = Math.min(Math.abs(mainVal) / maxMain * 50, 50); // max 50% from center
+    const fv = fmtVal(v.r, v.usd, metric);
+    const subCount = v.count ? `<span style="font-size:10px;color:var(--text3);margin-left:6px;">${v.count}筆</span>` : '';
+
+    html += `<div class="bar-row">
+      <div class="bar-label">${label}</div>
+      <div class="bar-track">
+        <div class="bar-center"></div>
+        ${mainVal >= 0
+          ? `<div class="bar-fill-pos" style="width:${pct}%;"></div>`
+          : `<div class="bar-fill-neg" style="width:${pct}%;"></div>`
+        }
+      </div>
+      <div class="bar-val ${fv.cls}">${fv.str}${subCount}</div>
+    </div>`;
+  });
+  html += '</div>';
+  el.innerHTML = html;
+}
+
 function render() {
   const data = getFiltered();
   const base = getBaseFiltered();
@@ -879,6 +1099,7 @@ function render() {
   renderBreakdownCharts(base);
   renderMinRR(data);
   renderWeekdayChart(base);
+  renderPeriodView();
   renderTable(data);
 }
 
