@@ -1,0 +1,1435 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>交易日誌</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#f5f4f0;--bg2:#ffffff;--bg3:#eeedea;--bg4:#e5e3de;
+  --border:#dedcd7;--border2:#c9c6bf;
+  --text:#1a1916;--text2:#5a5850;--text3:#9a9890;
+  --green:#166534;--green-bg:#dcfce7;--green-border:#86efac;--green-mid:#16a34a;
+  --red:#991b1b;--red-bg:#fee2e2;--red-border:#fca5a5;--red-mid:#dc2626;
+  --amber:#92400e;--amber-bg:#fef3c7;--amber-border:#fcd34d;--amber-mid:#d97706;
+  --blue:#1e3a5f;--blue-bg:#dbeafe;--blue-border:#93c5fd;--blue-mid:#2563eb;
+  --teal:#134e4a;--teal-bg:#ccfbf1;--teal-mid:#0d9488;
+  --purple:#4c1d95;--purple-bg:#ede9fe;--purple-mid:#7c3aed;
+}
+body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:2rem 1.5rem 6rem;}
+.page{max-width:1100px;margin:0 auto;}
+
+/* Header */
+.header{display:flex;align-items:flex-start;justify-content:space-between;padding-bottom:1.25rem;border-bottom:1.5px solid var(--border);margin-bottom:2rem;flex-wrap:wrap;gap:12px;}
+.header-left h1{font-size:20px;font-weight:600;letter-spacing:0.01em;margin-bottom:3px;}
+.header-left p{font-size:11px;color:var(--text3);letter-spacing:0.04em;}
+.header-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+#save-status{font-size:11px;color:var(--green-mid);opacity:0;transition:opacity 0.4s;}
+
+/* Buttons */
+.btn{border-radius:8px;padding:9px 16px;font-size:12px;font-family:'Sora',sans-serif;font-weight:500;cursor:pointer;border:1px solid;transition:all 0.15s;white-space:nowrap;letter-spacing:0.02em;}
+.btn-primary{background:var(--text);border-color:var(--text);color:#fff;}
+.btn-primary:hover{opacity:0.85;}
+.btn-green{background:var(--green-bg);border-color:var(--green-border);color:var(--green);}
+.btn-green:hover{background:#bbf7d0;}
+.btn-red{background:var(--red-bg);border-color:var(--red-border);color:var(--red);}
+.btn-red:hover{background:#fecaca;}
+.btn-ghost{background:var(--bg3);border-color:var(--border);color:var(--text2);}
+.btn-ghost:hover{background:var(--bg4);}
+
+/* Modal */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.35);z-index:100;align-items:center;justify-content:center;padding:1rem;}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--bg2);border-radius:16px;padding:1.75rem;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;border:1px solid var(--border);}
+.modal h2{font-size:16px;font-weight:600;margin-bottom:1.5rem;}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;}
+.form-item{display:flex;flex-direction:column;gap:5px;}
+.form-item.full{grid-column:1/-1;}
+.form-item label{font-size:11px;color:var(--text3);letter-spacing:0.04em;font-weight:500;}
+.form-item input,.form-item select{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;font-family:'Sora',sans-serif;color:var(--text);outline:none;transition:border-color 0.15s;width:100%;}
+.form-item input:focus,.form-item select:focus{border-color:var(--border2);background:var(--bg2);}
+.form-item select{cursor:pointer;}
+.modal-footer{display:flex;gap:8px;justify-content:flex-end;margin-top:1.25rem;padding-top:1.25rem;border-top:1px solid var(--border);}
+.result-toggle{display:flex;gap:6px;margin-bottom:12px;}
+.result-btn{flex:1;padding:8px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:'Sora',sans-serif;cursor:pointer;background:var(--bg3);color:var(--text2);font-weight:500;transition:all 0.15s;}
+.result-btn.active-win{background:var(--green-bg);border-color:var(--green-border);color:var(--green);}
+.result-btn.active-be{background:var(--blue-bg);border-color:var(--blue-border);color:var(--blue);}
+.result-btn.active-loss{background:var(--red-bg);border-color:var(--red-border);color:var(--red);}
+.sop-toggle{display:flex;gap:6px;margin-bottom:12px;}
+.sop-btn{flex:1;padding:8px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:'Sora',sans-serif;cursor:pointer;background:var(--bg3);color:var(--text2);font-weight:500;transition:all 0.15s;}
+.sop-btn.active-yes{background:var(--green-bg);border-color:var(--green-border);color:var(--green);}
+.sop-btn.active-no{background:var(--amber-bg);border-color:var(--amber-border);color:var(--amber);}
+
+/* Filters */
+.filters{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:1.125rem 1.5rem;margin-bottom:1.25rem;}
+.filter-row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;}
+.filter-item{display:flex;flex-direction:column;gap:4px;min-width:110px;}
+.filter-item label{font-size:10px;color:var(--text3);letter-spacing:0.06em;font-weight:500;text-transform:uppercase;}
+.filter-item input,.filter-item select{background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:7px 10px;font-size:12px;font-family:'Sora',sans-serif;color:var(--text);outline:none;cursor:pointer;}
+.filter-item input:focus,.filter-item select:focus{border-color:var(--border2);}
+.filter-reset{align-self:flex-end;}
+
+/* Stats bar */
+.stats-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:1.25rem;}
+.stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:0.875rem 1rem;}
+.stat-card .s-label{font-size:10px;color:var(--text3);letter-spacing:0.05em;margin-bottom:5px;}
+.stat-card .s-val{font-size:20px;font-weight:300;font-family:'JetBrains Mono',monospace;color:var(--text);}
+.stat-card .s-val.green{color:var(--green-mid);}
+.stat-card .s-val.red{color:var(--red-mid);}
+.stat-card .s-val.amber{color:var(--amber-mid);}
+.stat-card .s-sub{font-size:10px;color:var(--text3);margin-top:3px;}
+
+/* Charts row */
+.charts-row{display:grid;grid-template-columns:2fr 1fr;gap:14px;margin-bottom:1.25rem;}
+.chart-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:1.125rem;}
+.chart-card h4{font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--text3);margin-bottom:1rem;}
+.chart-wrap{position:relative;width:100%;height:220px;}
+.chart-wrap-sm{position:relative;width:100%;height:220px;}
+
+/* Metrics row */
+.metrics-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:1.25rem;}
+.metric-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:0.875rem 1rem;}
+.metric-card .m-label{font-size:10px;color:var(--text3);letter-spacing:0.05em;margin-bottom:5px;line-height:1.4;}
+.metric-card .m-val{font-size:18px;font-weight:300;font-family:'JetBrains Mono',monospace;margin-bottom:4px;}
+.m-green{color:var(--green-mid);}
+.m-red{color:var(--red-mid);}
+.m-amber{color:var(--amber-mid);}
+.m-blue{color:var(--blue-mid);}
+.m-teal{color:var(--teal-mid);}
+.m-default{color:var(--text);}
+.m-badge{display:inline-flex;font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;letter-spacing:0.04em;}
+.badge-great{background:var(--green-bg);color:var(--green);}
+.badge-good{background:var(--blue-bg);color:var(--blue);}
+.badge-ok{background:var(--amber-bg);color:var(--amber);}
+.badge-poor{background:var(--red-bg);color:var(--red);}
+
+/* Bench table */
+.bench-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:1.25rem;}
+.bench-table{width:100%;border-collapse:collapse;font-size:12px;}
+.bench-table th{padding:9px 14px;text-align:left;font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--text3);border-bottom:1px solid var(--border);background:var(--bg3);}
+.bench-table td{padding:9px 14px;border-bottom:1px solid var(--border);color:var(--text2);font-family:'JetBrains Mono',monospace;font-size:11px;}
+.bench-table tr:last-child td{border-bottom:none;}
+.td-great{color:var(--green-mid)!important;font-weight:500;}
+.td-good{color:var(--blue-mid)!important;font-weight:500;}
+.td-ok{color:var(--amber-mid)!important;font-weight:500;}
+.td-poor{color:var(--red-mid)!important;font-weight:500;}
+.td-hi{color:var(--text)!important;font-weight:600;}
+
+/* Trade table */
+.table-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:0.875rem;}
+.table-header h3{font-size:12px;font-weight:600;color:var(--text2);}
+.trade-table-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+.trade-table{width:100%;border-collapse:collapse;font-size:12px;}
+.trade-table th{padding:9px 12px;text-align:left;font-size:10px;font-weight:600;letter-spacing:0.07em;text-transform:uppercase;color:var(--text3);border-bottom:1px solid var(--border);background:var(--bg3);white-space:nowrap;}
+.trade-table td{padding:9px 12px;border-bottom:1px solid var(--border);color:var(--text2);white-space:nowrap;}
+.trade-table tr:last-child td{border-bottom:none;}
+.trade-table tr:hover td{background:var(--bg3);}
+.pill{display:inline-block;font-size:10px;font-weight:600;padding:2px 9px;border-radius:20px;letter-spacing:0.03em;}
+.pill-win{background:var(--green-bg);color:var(--green);}
+.pill-be{background:var(--blue-bg);color:var(--blue);}
+.pill-loss{background:var(--red-bg);color:var(--red);}
+.pill-sop{background:var(--green-bg);color:var(--green);}
+.pill-nosop{background:var(--amber-bg);color:var(--amber);}
+.r-pos{color:var(--green-mid);font-weight:500;font-family:'JetBrains Mono',monospace;}
+.r-neg{color:var(--red-mid);font-weight:500;font-family:'JetBrains Mono',monospace;}
+.r-zero{color:var(--text3);font-family:'JetBrains Mono',monospace;}
+.act-btn{background:none;border:none;cursor:pointer;color:var(--text3);font-size:13px;padding:3px 6px;border-radius:5px;transition:all 0.12s;}
+.act-btn:hover{background:var(--red-bg);color:var(--red-mid);}
+.notes-row>td{background:var(--bg3);padding:8px 16px 12px;border-bottom:1px solid var(--border);}
+.notes-label{font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--text3);margin-bottom:5px;}
+.notes-content{font-size:12px;color:var(--text2);line-height:1.8;white-space:pre-wrap;word-break:break-word;}
+.btn-notes{background:none;border:none;cursor:pointer;font-size:13px;padding:2px 4px;border-radius:4px;transition:background 0.12s;color:var(--text3);}
+.btn-notes:hover{background:var(--bg4);}
+.empty-state{text-align:center;padding:3rem;color:var(--text3);font-size:13px;}
+
+
+/* Period heatmap */
+.period-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:1.125rem;margin-bottom:1.25rem;}
+.period-card h4{font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--text3);margin-bottom:1rem;}
+.period-controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:1.25rem;}
+.period-controls select,.period-controls input{background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:6px 10px;font-size:12px;font-family:'Sora',sans-serif;color:var(--text);outline:none;cursor:pointer;}
+.period-controls select:focus,.period-controls input:focus{border-color:var(--border2);}
+.period-nav{display:flex;align-items:center;gap:8px;margin-left:auto;}
+.period-nav button{background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:5px 12px;font-size:13px;cursor:pointer;color:var(--text2);transition:all 0.12s;}
+.period-nav button:hover{background:var(--bg4);}
+.period-nav .nav-title{font-size:14px;font-weight:500;color:var(--text);min-width:100px;text-align:center;font-family:'JetBrains Mono',monospace;}
+/* Calendar grid */
+.cal-wrap{overflow-x:auto;}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;min-width:560px;}
+.cal-header{text-align:center;font-size:10px;font-weight:600;letter-spacing:0.06em;color:var(--text3);padding:4px 0;text-transform:uppercase;}
+.cal-cell{background:var(--bg3);border-radius:10px;padding:8px 6px;min-height:64px;display:flex;flex-direction:column;gap:3px;border:1px solid transparent;transition:border-color 0.12s;}
+.cal-cell:hover{border-color:var(--border2);}
+.cal-cell.empty{background:transparent;border-color:transparent;}
+.cal-cell.has-trade-pos{background:#f0fdf4;border-color:#bbf7d0;}
+.cal-cell.has-trade-neg{background:#fff1f2;border-color:#fecdd3;}
+.cal-cell.today{border-color:var(--blue-mid);}
+.cal-day{font-size:12px;font-weight:500;color:var(--text2);}
+.cal-val{font-size:11px;font-family:'JetBrains Mono',monospace;font-weight:500;}
+.cal-val.pos{color:var(--green-mid);}
+.cal-val.neg{color:var(--red-mid);}
+.cal-val.zero{color:var(--text3);font-weight:400;}
+.cal-count{font-size:10px;color:var(--text3);}
+/* Bar grid for month/year view */
+.bar-grid{display:grid;gap:6px;}
+.bar-row{display:grid;grid-template-columns:80px 1fr 90px;align-items:center;gap:10px;}
+.bar-label{font-size:12px;color:var(--text2);text-align:right;}
+.bar-track{background:var(--bg3);border-radius:4px;height:28px;position:relative;overflow:hidden;}
+.bar-fill-pos{position:absolute;left:50%;top:0;height:100%;background:#bbf7d0;transition:width 0.3s;}
+.bar-fill-neg{position:absolute;right:50%;top:0;height:100%;background:#fecdd3;transition:width 0.3s;}
+.bar-center{position:absolute;left:50%;top:0;width:1px;height:100%;background:var(--border2);}
+.bar-val{font-size:12px;font-family:'JetBrains Mono',monospace;font-weight:500;text-align:right;}
+.bar-val.pos{color:var(--green-mid);}
+.bar-val.neg{color:var(--red-mid);}
+.bar-val.zero{color:var(--text3);}
+
+@media(max-width:700px){
+  .stats-grid{grid-template-columns:repeat(2,1fr);}
+  .metrics-grid{grid-template-columns:repeat(2,1fr);}
+  .charts-row{grid-template-columns:1fr;}
+  .form-grid{grid-template-columns:1fr;}
+  .form-item.full{grid-column:1;}
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+<!-- Header -->
+<div class="header">
+  <div class="header-left">
+    <h1>交易日誌</h1>
+    <p>Trade Journal · 逐筆記錄 · 自動儲存</p>
+  </div>
+  <div class="header-right">
+    <span id="save-status"></span>
+    <button class="btn btn-ghost" onclick="exportCSV()">匯出 CSV</button>
+    <label class="btn btn-ghost" style="cursor:pointer;" title="從 Notion 匯出的 CSV 上傳">&#8679; 匯入 CSV<input type="file" id="csv-upload" accept=".csv" style="display:none;" onchange="importCSV(this)"></label>
+    <button class="btn btn-red" style="font-size:11px;padding:7px 12px;" onclick="clearAll()">清除所有數據</button>
+    <button class="btn btn-primary" onclick="openModal()">＋ 新增交易</button>
+  </div>
+</div>
+
+<!-- Filters -->
+<div class="filters">
+  <div class="filter-row">
+    <div class="filter-item">
+      <label>開始日期</label>
+      <input type="date" id="f-start">
+    </div>
+    <div class="filter-item">
+      <label>結束日期</label>
+      <input type="date" id="f-end">
+    </div>
+    <div class="filter-item">
+      <label>結果</label>
+      <select id="f-result">
+        <option value="">全部</option>
+        <option value="win">獲利</option>
+        <option value="be">保本</option>
+        <option value="loss">虧損</option>
+      </select>
+    </div>
+    <div class="filter-item">
+      <label>週期</label>
+      <select id="f-tf">
+        <option value="">全部</option>
+        <option value="15m">15m</option>
+        <option value="30m">30m</option>
+        <option value="1h">1h</option>
+        <option value="2h">2h</option>
+      </select>
+    </div>
+    <div class="filter-item">
+      <label>策略</label>
+      <select id="f-strat">
+        <option value="">全部</option>
+        <option value="三均線多頭排列壓縮">三均線多頭排列壓縮</option>
+        <option value="三均線收斂至一點">三均線收斂至一點</option>
+      </select>
+    </div>
+    <div class="filter-item">
+      <label>SOP</label>
+      <select id="f-sop">
+        <option value="">全部</option>
+        <option value="yes">符合</option>
+        <option value="no">不符合</option>
+      </select>
+    </div>
+    <div class="filter-item">
+      <label>時段</label>
+      <select id="f-session">
+        <option value="">全部</option>
+        <option value="00-06">00:00–06:00（亞洲深夜）</option>
+        <option value="06-12">06:00–12:00（亞洲早盤）</option>
+        <option value="12-18">12:00–18:00（亞洲午後/歐盤）</option>
+        <option value="18-24">18:00–24:00（美盤）</option>
+      </select>
+    </div>
+    <div class="filter-item filter-reset">
+      <button class="btn btn-ghost" style="font-size:11px;padding:7px 12px;" onclick="resetFilters()">重置篩選</button>
+    </div>
+  </div>
+</div>
+
+<!-- Stats bar -->
+<div class="stats-grid" id="stats-grid"></div>
+
+<!-- Charts -->
+<div class="charts-row">
+  <div class="chart-card">
+    <h4>累積損益曲線（R）</h4>
+    <div class="chart-wrap"><canvas id="chart-equity"></canvas></div>
+  </div>
+  <div class="chart-card">
+    <h4>交易結果分布</h4>
+    <div class="chart-wrap-sm"><canvas id="chart-dist"></canvas></div>
+  </div>
+</div>
+
+<!-- Time performance chart -->
+<div class="chart-card" style="margin-bottom:1.25rem;">
+  <h4>各時段績效分析（平均 R）</h4>
+  <div style="position:relative;width:100%;height:200px;"><canvas id="chart-session"></canvas></div>
+</div>
+
+<!-- Strategy & TF charts -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:1.25rem;" id="breakdown-charts">
+  <div class="chart-card">
+    <h4>各策略績效分析</h4>
+    <div style="position:relative;width:100%;height:260px;"><canvas id="chart-strat"></canvas></div>
+  </div>
+  <div class="chart-card">
+    <h4>各時間週期績效分析</h4>
+    <div style="position:relative;width:100%;height:260px;"><canvas id="chart-tf"></canvas></div>
+  </div>
+</div>
+
+<!-- Metrics -->
+<div class="metrics-grid" id="metrics-grid"></div>
+
+<!-- Benchmark -->
+<div class="bench-wrap">
+  <table class="bench-table" id="bench-table"></table>
+</div>
+
+<!-- Min RR requirement + Weekday chart -->
+<div style="display:grid;grid-template-columns:1fr 2fr;gap:14px;margin-bottom:1.25rem;">
+  <div class="chart-card" id="min-rr-card">
+    <h4>損益平衡最低風報比</h4>
+    <div id="min-rr-content" style="padding-top:4px;"></div>
+  </div>
+  <div class="chart-card">
+    <h4>各星期績效分析（平均 R）</h4>
+    <div style="position:relative;width:100%;height:200px;"><canvas id="chart-weekday"></canvas></div>
+  </div>
+</div>
+
+<!-- Period Performance View -->
+<div class="period-card">
+  <h4>損益日曆 / 月視圖 / 年視圖</h4>
+  <div class="period-controls">
+    <div>
+      <label style="font-size:10px;color:var(--text3);display:block;margin-bottom:3px;letter-spacing:0.05em;text-transform:uppercase;">顯示單位</label>
+      <select id="pv-unit" onchange="renderPeriodView()">
+        <option value="day">日（月曆）</option>
+        <option value="month">月（年視圖）</option>
+        <option value="year">年（全覽）</option>
+      </select>
+    </div>
+    <div>
+      <label style="font-size:10px;color:var(--text3);display:block;margin-bottom:3px;letter-spacing:0.05em;text-transform:uppercase;">數值</label>
+      <select id="pv-metric" onchange="renderPeriodView()">
+        <option value="usd">損益 USD</option>
+        <option value="r">損益 R</option>
+        <option value="both">兩者都顯示</option>
+      </select>
+    </div>
+    <div class="period-nav">
+      <button onclick="periodNav(-1)">&#8249;</button>
+      <span class="nav-title" id="pv-title">—</span>
+      <button onclick="periodNav(1)">&#8250;</button>
+    </div>
+  </div>
+  <div class="cal-wrap" id="pv-content"></div>
+</div>
+
+<!-- Trade list -->
+<div class="table-header">
+  <h3 id="trade-count-label">交易記錄</h3>
+</div>
+<div class="trade-table-wrap">
+  <table class="trade-table">
+    <thead>
+      <tr>
+        <th>日期</th>
+        <th>時間</th>
+        <th>標的</th>
+        <th>週期</th>
+        <th>策略</th>
+        <th>結果</th>
+        <th>SOP</th>
+        <th>損益 R</th>
+        <th>損益 USD</th>
+        <th>總結反省</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="trade-tbody"></tbody>
+  </table>
+</div>
+
+</div><!-- /page -->
+
+<!-- Add/Edit Modal -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <h2 id="modal-title">新增交易</h2>
+
+    <div class="form-grid">
+      <div class="form-item">
+        <label>日期</label>
+        <input type="date" id="f-date">
+      </div>
+      <div class="form-item">
+        <label>進場時間（選填）</label>
+        <input type="time" id="f-time" placeholder="例：14:00">
+      </div>
+      <div class="form-item full">
+        <label>標的名稱</label>
+        <input type="text" id="f-symbol" placeholder="例：BTCUSDT">
+      </div>
+    </div>
+
+    <div style="margin-bottom:8px;font-size:11px;color:var(--text3);letter-spacing:0.04em;font-weight:500;text-transform:uppercase;">交易結果</div>
+    <div class="result-toggle" id="result-toggle">
+      <button class="result-btn" data-val="win" onclick="setResult('win')">獲利</button>
+      <button class="result-btn" data-val="be" onclick="setResult('be')">保本</button>
+      <button class="result-btn" data-val="loss" onclick="setResult('loss')">虧損</button>
+    </div>
+
+    <div style="margin-bottom:8px;font-size:11px;color:var(--text3);letter-spacing:0.04em;font-weight:500;text-transform:uppercase;">符合 SOP</div>
+    <div class="sop-toggle" id="sop-toggle">
+      <button class="sop-btn" data-val="yes" onclick="setSop('yes')">符合 SOP</button>
+      <button class="sop-btn" data-val="no" onclick="setSop('no')">不符合 SOP</button>
+    </div>
+
+    <div class="form-grid">
+      <div class="form-item">
+        <label>時間週期</label>
+        <select id="f-tf-modal">
+          <option value="15m">15m</option>
+          <option value="30m">30m</option>
+          <option value="1h">1h</option>
+          <option value="2h">2h</option>
+        </select>
+      </div>
+      <div class="form-item">
+        <label>策略</label>
+        <select id="f-strat-modal">
+          <option value="三均線多頭排列壓縮">三均線多頭排列壓縮</option>
+          <option value="三均線收斂至一點">三均線收斂至一點</option>
+        </select>
+      </div>
+      <div class="form-item">
+        <label>損益 R 數</label>
+        <input type="number" id="f-r" step="0.01" placeholder="例：2.5 或 -1.2">
+      </div>
+      <div class="form-item">
+        <label>損益美元（USD）</label>
+        <input type="number" id="f-usd" step="0.01" placeholder="例：150 或 -60">
+      </div>
+    </div>
+
+    <div class="form-grid">
+      <div class="form-item full">
+        <label>總結反省（選填）</label>
+        <textarea id="f-notes" rows="3" placeholder="記錄這筆交易的心得、反省或觀察..." style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;font-family:'Sora',sans-serif;color:var(--text);outline:none;width:100%;resize:vertical;line-height:1.6;transition:border-color 0.15s;"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">取消</button>
+      <button class="btn btn-primary" onclick="saveTrade()">儲存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = 'trade_journal_v1';
+let trades = [];
+let editingId = null;
+let formResult = '';
+let formSop = '';
+let charts = {};
+
+// ── Storage ──────────────────────────────────────────
+function save() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(trades));
+  const el = document.getElementById('save-status');
+  el.textContent = '已儲存 ' + new Date().toLocaleTimeString('zh-TW');
+  el.style.opacity = '1';
+  clearTimeout(save._t);
+  save._t = setTimeout(() => { el.style.opacity = '0'; }, 2500);
+}
+
+function load() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) trades = JSON.parse(raw);
+  } catch(e) { trades = []; }
+}
+
+// ── Modal ─────────────────────────────────────────────
+function openModal(id) {
+  editingId = id || null;
+  document.getElementById('modal-title').textContent = id ? '編輯交易' : '新增交易';
+  if (id) {
+    const t = trades.find(x => x.id === id);
+    document.getElementById('f-date').value = t.date;
+    document.getElementById('f-time').value = t.time || '';
+    document.getElementById('f-symbol').value = t.symbol;
+    document.getElementById('f-notes').value = t.notes || '';
+    document.getElementById('f-tf-modal').value = t.tf;
+    document.getElementById('f-strat-modal').value = t.strat;
+    document.getElementById('f-r').value = t.r;
+    document.getElementById('f-usd').value = t.usd;
+    setResult(t.result);
+    setSop(t.sop);
+  } else {
+    document.getElementById('f-date').value = new Date().toISOString().slice(0,10);
+    document.getElementById('f-time').value = '';
+    document.getElementById('f-symbol').value = '';
+    document.getElementById('f-notes').value = '';
+    document.getElementById('f-tf-modal').value = '1h';
+    document.getElementById('f-strat-modal').value = '三均線壓縮';
+    document.getElementById('f-r').value = '';
+    document.getElementById('f-usd').value = '';
+    setResult('');
+    setSop('');
+  }
+  document.getElementById('modal').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.remove('open');
+  editingId = null;
+}
+
+document.getElementById('modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('modal')) closeModal();
+});
+
+function setResult(val) {
+  formResult = val;
+  document.querySelectorAll('.result-btn').forEach(b => {
+    b.className = 'result-btn';
+    if (b.dataset.val === val) b.classList.add('active-' + val);
+  });
+}
+
+function setSop(val) {
+  formSop = val;
+  document.querySelectorAll('.sop-btn').forEach(b => {
+    b.className = 'sop-btn';
+    if (b.dataset.val === val) b.classList.add('active-' + val);
+  });
+}
+
+function saveTrade() {
+  const date = document.getElementById('f-date').value;
+  const symbol = document.getElementById('f-symbol').value.trim().toUpperCase();
+  const r = parseFloat(document.getElementById('f-r').value);
+  const usd = parseFloat(document.getElementById('f-usd').value);
+  if (!date) { alert('請輸入日期'); return; }
+  if (!symbol) { alert('請輸入標的名稱'); return; }
+  if (!formResult) { alert('請選擇交易結果'); return; }
+  if (!formSop) { alert('請選擇是否符合 SOP'); return; }
+  if (isNaN(r)) { alert('請輸入損益 R 數'); return; }
+  if (isNaN(usd)) { alert('請輸入損益美元'); return; }
+
+  const trade = {
+    id: editingId || Date.now().toString(),
+    date,
+    time: document.getElementById('f-time').value || '',
+    symbol,
+    result: formResult,
+    sop: formSop,
+    tf: document.getElementById('f-tf-modal').value,
+    strat: document.getElementById('f-strat-modal').value,
+    r,
+    usd,
+    notes: document.getElementById('f-notes').value || ''
+  };
+
+  if (editingId) {
+    const idx = trades.findIndex(x => x.id === editingId);
+    trades[idx] = trade;
+  } else {
+    trades.push(trade);
+  }
+
+  trades.sort((a, b) => a.date.localeCompare(b.date));
+  save();
+  closeModal();
+  render();
+}
+
+function deleteTrade(id) {
+  if (!confirm('確定要刪除這筆交易？')) return;
+  trades = trades.filter(x => x.id !== id);
+  save();
+  render();
+}
+
+// ── Filters ───────────────────────────────────────────
+function getHour(t) {
+  if (!t.time) return null;
+  const m = t.time.match(/^(\d{1,2}):/);
+  return m ? parseInt(m[1]) : null;
+}
+
+function getFiltered() {
+  const fs = document.getElementById('f-start').value;
+  const fe = document.getElementById('f-end').value;
+  const fr = document.getElementById('f-result').value;
+  const ftf = document.getElementById('f-tf').value;
+  const fst = document.getElementById('f-strat').value;
+  const fsop = document.getElementById('f-sop').value;
+  const fses = document.getElementById('f-session').value;
+  return trades.filter(t => {
+    if (fs && t.date < fs) return false;
+    if (fe && t.date > fe) return false;
+    if (fr && t.result !== fr) return false;
+    if (ftf && t.tf !== ftf) return false;
+    if (fst && t.strat !== fst) return false;
+    if (fsop && t.sop !== fsop) return false;
+    if (fses) {
+      const h = getHour(t);
+      if (h === null) return false;
+      const [s, e] = fses.split('-').map(Number);
+      if (h < s || h >= e) return false;
+    }
+    return true;
+  });
+}
+
+function resetFilters() {
+  ['f-start','f-end','f-result','f-tf','f-strat','f-sop','f-session'].forEach(id => {
+    const el = document.getElementById(id);
+    el.value = '';
+  });
+  render();
+}
+
+// ── Stats ─────────────────────────────────────────────
+function calcStats(data) {
+  const total = data.length;
+  if (!total) return null;
+  const wins = data.filter(t => t.result === 'win');
+  const losses = data.filter(t => t.result === 'loss');
+  const bes = data.filter(t => t.result === 'be');
+  const totalR = data.reduce((a, t) => a + t.r, 0);
+  const totalUSD = data.reduce((a, t) => a + t.usd, 0);
+  const grossProfit = wins.reduce((a, t) => a + t.r, 0);
+  const grossLoss = Math.abs(losses.reduce((a, t) => a + t.r, 0));
+  const avgWin = wins.length ? grossProfit / wins.length : 0;
+  const avgLoss = losses.length ? grossLoss / losses.length : 0;
+  const pf = grossLoss > 0 ? grossProfit / grossLoss : (grossProfit > 0 ? 999 : 0);
+  const ev = totalR / total;
+  const sopCount = data.filter(t => t.sop === 'yes').length;
+  const sopRate = sopCount / total;
+  return { total, wins: wins.length, losses: losses.length, bes: bes.length,
+    totalR, totalUSD, grossProfit, grossLoss, avgWin, avgLoss, pf, ev,
+    winRate: wins.length / total, lossRate: losses.length / total, beRate: bes.length / total,
+    sopRate, sopCount };
+}
+
+// ── Render ────────────────────────────────────────────
+function makeBreakdownChart(canvasId, groups, allData) {
+  destroyChart(canvasId);
+  const labels = [], evData = [], countData = [], winRates = [], bgColors = [];
+
+  groups.forEach(g => {
+    const group = allData.filter(g.filter);
+    if (!group.length) return;
+    const totalR = group.reduce((a,t)=>a+t.r,0);
+    const ev = parseFloat((totalR/group.length).toFixed(3));
+    const wins = group.filter(t=>t.result==='win').length;
+    const wr = parseFloat((wins/group.length*100).toFixed(1));
+    labels.push(g.label);
+    evData.push(ev);
+    countData.push(group.length);
+    winRates.push(wr);
+    bgColors.push(ev >= 0.1 ? '#16a34a' : ev >= 0 ? '#d97706' : '#dc2626');
+  });
+
+  if (!labels.length) return;
+
+  const ctx = document.getElementById(canvasId);
+  charts[canvasId] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: '平均期望值 R',
+        data: evData,
+        backgroundColor: bgColors,
+        borderRadius: 5,
+        barThickness: labels.length <= 3 ? 48 : undefined,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: {
+          label: (ctx) => {
+            const i = ctx.dataIndex;
+            const v = ctx.parsed.x;
+            return [
+              ` 期望值：${v>=0?'+':''}${v} R`,
+              ` 勝率：${winRates[i]}%`,
+              ` 筆數：${countData[i]} 筆`,
+            ];
+          }
+        }}
+      },
+      scales: {
+        y: { grid:{display:false}, ticks:{color:'#5a5850',font:{size:11}} },
+        x: { grid:{color:'rgba(0,0,0,0.05)'}, ticks:{color:'#9a9890',font:{size:10}, callback:v=>(v>=0?'+':'')+v+'R'},
+          afterDataLimits: scale => { scale.max = Math.max(scale.max, 0.1); scale.min = Math.min(scale.min, -0.1); }
+        }
+      }
+    }
+  });
+}
+
+function renderBreakdownCharts(base) {
+  // Strategy chart — use all unique strats in data
+  const strats = [...new Set(base.map(t=>t.strat).filter(Boolean))].sort();
+  makeBreakdownChart('chart-strat', strats.map(s=>({
+    label: s,
+    filter: t => t.strat === s
+  })), base);
+
+  // TF chart — fixed order
+  const tfs = ['15m','30m','1h','2h'];
+  const tfLabel = {'15m':'15m','30m':'30m','1h':'1h','2h':'2h'};
+  makeBreakdownChart('chart-tf', tfs.map(tf=>({
+    label: tfLabel[tf],
+    filter: t => t.tf === tf
+  })).filter(g => base.some(g.filter)), base);
+}
+
+function renderSessionChart() {
+  destroyChart('session');
+  // Use ALL trades (not filtered by session) to show time breakdown
+  const fs = document.getElementById('f-start').value;
+  const fe = document.getElementById('f-end').value;
+  const fr = document.getElementById('f-result').value;
+  const ftf = document.getElementById('f-tf').value;
+  const fst = document.getElementById('f-strat').value;
+  const fsop = document.getElementById('f-sop').value;
+  const base = trades.filter(t => {
+    if (fs && t.date < fs) return false;
+    if (fe && t.date > fe) return false;
+    if (fr && t.result !== fr) return false;
+    if (ftf && t.tf !== ftf) return false;
+    if (fst && t.strat !== fst) return false;
+    if (fsop && t.sop !== fsop) return false;
+    return true;
+  });
+
+  const sessions = [
+    {label:'00–06', range:[0,6]},
+    {label:'06–09', range:[6,9]},
+    {label:'09–12', range:[9,12]},
+    {label:'12–15', range:[12,15]},
+    {label:'15–18', range:[15,18]},
+    {label:'18–21', range:[18,21]},
+    {label:'21–24', range:[21,24]},
+    {label:'時間未知', range:null},
+  ];
+
+  const evData = [], countData = [], bgColors = [];
+  sessions.forEach(ses => {
+    let group;
+    if (ses.range === null) {
+      group = base.filter(t => !t.time);
+    } else {
+      group = base.filter(t => {
+        const h = getHour(t);
+        if (h === null) return false;
+        return h >= ses.range[0] && h < ses.range[1];
+      });
+    }
+    const totalR = group.reduce((a,t)=>a+t.r,0);
+    const ev = group.length ? parseFloat((totalR/group.length).toFixed(3)) : null;
+    evData.push(ev);
+    countData.push(group.length);
+    bgColors.push(ev === null ? '#e5e3de' : ev >= 0.1 ? '#16a34a' : ev >= 0 ? '#d97706' : '#dc2626');
+  });
+
+  const ctx = document.getElementById('chart-session');
+  charts['session'] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: sessions.map(s=>s.label),
+      datasets: [{
+        label: '平均期望值 R',
+        data: evData,
+        backgroundColor: bgColors,
+        borderRadius: 5,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: {
+          label: (ctx) => {
+            const v = ctx.parsed.y;
+            const n = countData[ctx.dataIndex];
+            if (v === null) return ` 無資料`;
+            return ` 平均 ${v>=0?'+':''}${v} R（${n} 筆）`;
+          }
+        }}
+      },
+      scales: {
+        x: { grid:{display:false}, ticks:{color:'#9a9890',font:{size:11}} },
+        y: { grid:{color:'rgba(0,0,0,0.05)'}, ticks:{color:'#9a9890',font:{size:10}, callback:v=>(v>=0?'+':'')+v+'R'},
+          afterDataLimits: scale => { scale.max = Math.max(scale.max, 0.1); scale.min = Math.min(scale.min, -0.1); }
+        }
+      }
+    }
+  });
+}
+
+function renderMinRR(data) {
+  const el = document.getElementById('min-rr-content');
+  if (!data || !data.length) { el.innerHTML = '<p style="color:var(--text3);font-size:13px;">無資料</p>'; return; }
+  const total = data.length;
+  const wins = data.filter(t => t.result === 'win').length;
+  const losses = data.filter(t => t.result === 'loss').length;
+  const bes = data.filter(t => t.result === 'be').length;
+  const winRate = wins / total;
+  const lossRate = losses / total;
+  const beRate = bes / total;
+
+  // Break-even RR: winRate * RR - lossRate * 1 + beRate * 0 = 0
+  // => RR = lossRate / winRate
+  // But if we include BE trades as 0: EV = winRate*RR + beRate*0 - lossRate*1 = 0
+  // => RR_breakeven = lossRate / winRate
+  const rrBreakEven = winRate > 0 ? lossRate / winRate : null;
+
+  // For positive EV (e.g. +0.1R per trade):
+  // winRate * RR - lossRate = 0.1 => RR = (lossRate + 0.1) / winRate
+  const rrTarget01 = winRate > 0 ? (lossRate + 0.1) / winRate : null;
+  const rrTarget03 = winRate > 0 ? (lossRate + 0.3) / winRate : null;
+
+  // Current avg win R
+  const winTrades = data.filter(t => t.result === 'win');
+  const avgWin = winTrades.length ? winTrades.reduce((a,t)=>a+t.r,0)/winTrades.length : 0;
+  const currentEV = winRate * avgWin - lossRate;
+  const evClass = currentEV >= 0.1 ? 'style="color:var(--green-mid);font-weight:600;"' : currentEV >= 0 ? 'style="color:var(--amber-mid);font-weight:600;"' : 'style="color:var(--red-mid);font-weight:600;"';
+
+  el.innerHTML = `
+    <div style="margin-bottom:14px;">
+      <div style="font-size:11px;color:var(--text3);margin-bottom:4px;">目前勝率 / 敗率 / 保本率</div>
+      <div style="font-size:14px;font-family:'JetBrains Mono',monospace;color:var(--text);">
+        ${(winRate*100).toFixed(1)}% / ${(lossRate*100).toFixed(1)}% / ${(beRate*100).toFixed(1)}%
+      </div>
+    </div>
+    <div style="border-top:1px solid var(--border);padding-top:12px;display:flex;flex-direction:column;gap:10px;">
+      <div>
+        <div style="font-size:10px;color:var(--text3);margin-bottom:3px;letter-spacing:0.04em;">損益平衡最低風報比（EV = 0）</div>
+        <div style="font-size:22px;font-weight:300;font-family:'JetBrains Mono',monospace;color:var(--text);">
+          ${rrBreakEven !== null ? '1 : ' + rrBreakEven.toFixed(2) : 'N/A'}
+        </div>
+        <div style="font-size:11px;color:var(--text3);">每筆獲利至少需達 <strong style="color:var(--text);">${rrBreakEven !== null ? rrBreakEven.toFixed(2)+'R' : '—'}</strong></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <div style="background:var(--bg3);border-radius:8px;padding:8px 10px;">
+          <div style="font-size:10px;color:var(--text3);margin-bottom:3px;">達成 EV = +0.1R</div>
+          <div style="font-size:15px;font-weight:500;font-family:'JetBrains Mono',monospace;color:var(--blue-mid);">${rrTarget01 !== null ? '1 : '+rrTarget01.toFixed(2) : 'N/A'}</div>
+        </div>
+        <div style="background:var(--bg3);border-radius:8px;padding:8px 10px;">
+          <div style="font-size:10px;color:var(--text3);margin-bottom:3px;">達成 EV = +0.3R</div>
+          <div style="font-size:15px;font-weight:500;font-family:'JetBrains Mono',monospace;color:var(--green-mid);">${rrTarget03 !== null ? '1 : '+rrTarget03.toFixed(2) : 'N/A'}</div>
+        </div>
+      </div>
+      <div style="border-top:1px dashed var(--border);padding-top:10px;">
+        <div style="font-size:10px;color:var(--text3);margin-bottom:3px;">目前實際平均風報比 / 期望值</div>
+        <div style="font-size:14px;font-family:'JetBrains Mono',monospace;">
+          <span style="color:var(--text);">1 : ${avgWin.toFixed(2)}</span>
+          <span style="margin-left:10px;" ${evClass}>${currentEV>=0?'+':''}${currentEV.toFixed(3)} R</span>
+        </div>
+        <div style="font-size:11px;color:var(--text3);margin-top:3px;">
+          ${currentEV >= 0.1 ? '✓ 已達損益平衡，期望值健康' : currentEV >= 0 ? '△ 勉強損益平衡，建議提高風報比' : '✗ 低於損益平衡，需改善風報比或勝率'}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderWeekdayChart(base) {
+  destroyChart('weekday');
+  const days = ['週一','週二','週三','週四','週五','週六','週日'];
+  const evData = [], countData = [], winRates = [], bgColors = [];
+
+  days.forEach((label, i) => {
+    // JS getDay(): 0=Sun,1=Mon...6=Sat; we want Mon=0...Sun=6
+    const targetDay = i === 6 ? 0 : i + 1;
+    const group = base.filter(t => {
+      if (!t.date) return false;
+      const d = new Date(t.date + 'T12:00:00');
+      return d.getDay() === targetDay;
+    });
+    if (!group.length) { evData.push(null); countData.push(0); winRates.push(0); bgColors.push('#e5e3de'); return; }
+    const totalR = group.reduce((a,t)=>a+t.r,0);
+    const ev = parseFloat((totalR/group.length).toFixed(3));
+    const wr = parseFloat((group.filter(t=>t.result==='win').length/group.length*100).toFixed(1));
+    evData.push(ev);
+    countData.push(group.length);
+    winRates.push(wr);
+    bgColors.push(ev >= 0.1 ? '#16a34a' : ev >= 0 ? '#d97706' : '#dc2626');
+  });
+
+  const ctx = document.getElementById('chart-weekday');
+  charts['weekday'] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: days,
+      datasets: [{
+        data: evData,
+        backgroundColor: bgColors,
+        borderRadius: 5,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: {
+          label: (ctx) => {
+            const i = ctx.dataIndex;
+            const v = ctx.parsed.y;
+            if (v === null) return ' 無資料';
+            return [
+              ` 期望值：${v>=0?'+':''}${v} R`,
+              ` 勝率：${winRates[i]}%`,
+              ` 筆數：${countData[i]} 筆`,
+            ];
+          }
+        }}
+      },
+      scales: {
+        x: { grid:{display:false}, ticks:{color:'#5a5850',font:{size:12}} },
+        y: { grid:{color:'rgba(0,0,0,0.05)'}, ticks:{color:'#9a9890',font:{size:10}, callback:v=>(v>=0?'+':'')+v+'R'},
+          afterDataLimits: scale => { scale.max = Math.max(scale.max||0, 0.1); scale.min = Math.min(scale.min||0, -0.1); }
+        }
+      }
+    }
+  });
+}
+
+function getBaseFiltered() {
+  // filters except session filter — for breakdown charts that show ALL sessions
+  const fs = document.getElementById('f-start').value;
+  const fe = document.getElementById('f-end').value;
+  const fr = document.getElementById('f-result').value;
+  const ftf = document.getElementById('f-tf').value;
+  const fst = document.getElementById('f-strat').value;
+  const fsop = document.getElementById('f-sop').value;
+  return trades.filter(t => {
+    if (fs && t.date < fs) return false;
+    if (fe && t.date > fe) return false;
+    if (fr && t.result !== fr) return false;
+    if (ftf && t.tf !== ftf) return false;
+    if (fst && t.strat !== fst) return false;
+    if (fsop && t.sop !== fsop) return false;
+    return true;
+  });
+}
+
+
+// ── Period View ───────────────────────────────────────
+let pvCursor = { year: new Date().getFullYear(), month: new Date().getMonth() }; // 0-indexed month
+
+function periodNav(dir) {
+  const unit = document.getElementById('pv-unit').value;
+  if (unit === 'day') {
+    pvCursor.month += dir;
+    if (pvCursor.month > 11) { pvCursor.month = 0; pvCursor.year++; }
+    if (pvCursor.month < 0)  { pvCursor.month = 11; pvCursor.year--; }
+  } else if (unit === 'month') {
+    pvCursor.year += dir;
+  }
+  // year view: no nav needed but allow anyway
+  renderPeriodView();
+}
+
+function fmtVal(r, usd, metric) {
+  if (metric === 'usd') {
+    if (usd === 0) return {str:'0', cls:'zero'};
+    return {str:(usd>0?'+':'')+usd.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}), cls:usd>0?'pos':'neg'};
+  }
+  if (metric === 'r') {
+    if (r === 0) return {str:'0', cls:'zero'};
+    return {str:(r>0?'+':'')+r.toFixed(2)+'R', cls:r>0?'pos':'neg'};
+  }
+  // both
+  const usdFmt = usd===0?'0':(usd>0?'+':'')+usd.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const rFmt   = r===0?'0':(r>0?'+':'')+r.toFixed(2)+'R';
+  const cls    = usd>0?'pos':usd<0?'neg':'zero';
+  return {str: usdFmt + '<br>' + rFmt, cls};
+}
+
+function renderPeriodView() {
+  const unit   = document.getElementById('pv-unit').value;
+  const metric = document.getElementById('pv-metric').value;
+  const el     = document.getElementById('pv-content');
+  const title  = document.getElementById('pv-title');
+
+  // aggregate trade data by date key
+  const byDay = {};
+  trades.forEach(t => {
+    if (!t.date) return;
+    byDay[t.date] = byDay[t.date] || {r:0, usd:0, count:0};
+    byDay[t.date].r     += t.r;
+    byDay[t.date].usd   += t.usd;
+    byDay[t.date].count += 1;
+  });
+
+  if (unit === 'day') {
+    const y = pvCursor.year, m = pvCursor.month;
+    const monthNames = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+    title.textContent = y + '-' + String(m+1).padStart(2,'0');
+    const firstDay = new Date(y, m, 1).getDay(); // 0=Sun
+    const daysInMonth = new Date(y, m+1, 0).getDate();
+    const todayStr = new Date().toISOString().slice(0,10);
+
+    let html = '<div class="cal-grid">';
+    const dayNames = ['S','M','T','W','T','F','S'];
+    dayNames.forEach(d => { html += `<div class="cal-header">${d}</div>`; });
+    // empty cells before first day
+    for (let i=0;i<firstDay;i++) html += '<div class="cal-cell empty"></div>';
+    for (let d=1; d<=daysInMonth; d++) {
+      const key = y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+      const day = byDay[key];
+      const isToday = key === todayStr;
+      let cls = 'cal-cell';
+      if (day && day.usd > 0) cls += ' has-trade-pos';
+      else if (day && day.usd < 0) cls += ' has-trade-neg';
+      if (isToday) cls += ' today';
+      html += `<div class="${cls}">`;
+      html += `<div class="cal-day">${d}</div>`;
+      if (day) {
+        const v = fmtVal(day.r, day.usd, metric);
+        html += `<div class="cal-val ${v.cls}">${v.str}</div>`;
+        html += `<div class="cal-count">${day.count}筆</div>`;
+      } else {
+        html += `<div class="cal-val zero" style="font-size:10px;">0</div>`;
+      }
+      html += '</div>';
+    }
+    html += '</div>';
+    el.innerHTML = html;
+
+  } else if (unit === 'month') {
+    const y = pvCursor.year;
+    title.textContent = y + '年';
+    // aggregate by month
+    const byMonth = {};
+    Object.entries(byDay).forEach(([key, v]) => {
+      const ky = parseInt(key.slice(0,4));
+      if (ky !== y) return;
+      const km = key.slice(0,7); // YYYY-MM
+      byMonth[km] = byMonth[km] || {r:0, usd:0, count:0};
+      byMonth[km].r     += v.r;
+      byMonth[km].usd   += v.usd;
+      byMonth[km].count += v.count;
+    });
+    const months = Array.from({length:12},(_,i)=>y+'-'+String(i+1).padStart(2,'0'));
+    const vals = months.map(m => byMonth[m] || {r:0,usd:0,count:0});
+    renderBarGrid(el, months.map((_,i)=>(i+1)+'月'), vals, metric);
+    title.textContent = y + '年';
+
+  } else {
+    // year view
+    title.textContent = '全部';
+    document.getElementById('pv-title').textContent = '全部年份';
+    const byYear = {};
+    Object.entries(byDay).forEach(([key, v]) => {
+      const ky = key.slice(0,4);
+      byYear[ky] = byYear[ky] || {r:0, usd:0, count:0};
+      byYear[ky].r     += v.r;
+      byYear[ky].usd   += v.usd;
+      byYear[ky].count += v.count;
+    });
+    const years = Object.keys(byYear).sort();
+    if (!years.length) { el.innerHTML = '<p style="color:var(--text3);font-size:13px;text-align:center;padding:2rem;">尚無資料</p>'; return; }
+    const vals = years.map(y => byYear[y]);
+    renderBarGrid(el, years.map(y=>y+'年'), vals, metric);
+  }
+}
+
+function renderBarGrid(el, labels, vals, metric) {
+  // find max abs for scale
+  const maxUSD = Math.max(...vals.map(v=>Math.abs(v.usd)), 1);
+  const maxR   = Math.max(...vals.map(v=>Math.abs(v.r)), 1);
+  let html = '<div class="bar-grid">';
+  labels.forEach((label, i) => {
+    const v = vals[i];
+    const mainVal = metric === 'r' ? v.r : v.usd;
+    const maxMain = metric === 'r' ? maxR : maxUSD;
+    const pct = Math.min(Math.abs(mainVal) / maxMain * 50, 50); // max 50% from center
+    const fv = fmtVal(v.r, v.usd, metric);
+    const subCount = v.count ? `<span style="font-size:10px;color:var(--text3);margin-left:6px;">${v.count}筆</span>` : '';
+
+    html += `<div class="bar-row">
+      <div class="bar-label">${label}</div>
+      <div class="bar-track">
+        <div class="bar-center"></div>
+        ${mainVal >= 0
+          ? `<div class="bar-fill-pos" style="width:${pct}%;"></div>`
+          : `<div class="bar-fill-neg" style="width:${pct}%;"></div>`
+        }
+      </div>
+      <div class="bar-val ${fv.cls}">${fv.str}${subCount}</div>
+    </div>`;
+  });
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+function render() {
+  const data = getFiltered();
+  const base = getBaseFiltered();
+  const s = calcStats(data);
+  renderStats(s, data.length);
+  renderMetrics(s);
+  renderBench(s);
+  renderCharts(data, s);
+  renderSessionChart();
+  renderBreakdownCharts(base);
+  renderMinRR(data);
+  renderWeekdayChart(base);
+  renderPeriodView();
+  renderTable(data);
+}
+
+function renderStats(s, count) {
+  const g = document.getElementById('stats-grid');
+  if (!s) {
+    g.innerHTML = '<div class="stat-card" style="grid-column:1/-1;text-align:center;color:var(--text3);font-size:13px;padding:2rem;">尚無交易記錄</div>';
+    return;
+  }
+  g.innerHTML = [
+    { label:'總筆數', val: s.total, sub:'', cls:'' },
+    { label:'總損益 R', val: (s.totalR>=0?'+':'')+s.totalR.toFixed(2)+' R', sub:'', cls: s.totalR>=0?'green':'red' },
+    { label:'總損益 USD', val: (s.totalUSD>=0?'+$':'-$')+Math.abs(s.totalUSD).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}), sub:'', cls: s.totalUSD>=0?'green':'red' },
+    { label:'每筆期望值', val: (s.ev>=0?'+':'')+s.ev.toFixed(3)+' R', sub:'', cls: s.ev>=0.1?'green':s.ev>=0?'amber':'red' },
+    { label:'勝 / 保 / 敗', val: `${s.wins} / ${s.bes} / ${s.losses}`, sub: `${(s.winRate*100).toFixed(0)}% / ${(s.beRate*100).toFixed(0)}% / ${(s.lossRate*100).toFixed(0)}%`, cls:'' },
+    { label:'SOP 遵守率', val: (s.sopRate*100).toFixed(1)+'%', sub: `${s.sopCount} / ${s.total} 筆`, cls: s.sopRate>=0.9?'green':s.sopRate>=0.7?'amber':'red' },
+  ].map(c => `<div class="stat-card"><div class="s-label">${c.label}</div><div class="s-val ${c.cls}">${c.val}</div><div class="s-sub">${c.sub}</div></div>`).join('');
+}
+
+function badge(level) {
+  const lbl={great:'很好',good:'好',ok:'普通',poor:'待改善'};
+  return `<span class="m-badge badge-${level}">${lbl[level]}</span>`;
+}
+function evR(v){return v>=0.3?'great':v>=0.1?'good':v>=0?'ok':'poor';}
+function pfR(v){return v>=2.5?'great':v>=1.75?'good':v>=1.25?'ok':'poor';}
+function rrR(v){return v>=3?'great':v>=2?'good':v>=1.5?'ok':'poor';}
+function wrR(v){return v>=0.5?'great':v>=0.35?'good':v>=0.25?'ok':'poor';}
+function mc(l){return{great:'m-green',good:'m-blue',ok:'m-amber',poor:'m-red'}[l];}
+function tc(l){return{great:'td-great',good:'td-good',ok:'td-ok',poor:'td-poor'}[l];}
+
+function renderMetrics(s) {
+  const g = document.getElementById('metrics-grid');
+  if (!s) { g.innerHTML=''; return; }
+  const pf = s.pf>=100?'∞':s.pf.toFixed(2);
+  g.innerHTML = [
+    {label:'勝率', val:(s.winRate*100).toFixed(1)+'%', cls:mc(wrR(s.winRate)), b:badge(wrR(s.winRate))},
+    {label:'Profit Factor', val:pf, cls:mc(pfR(s.pf)), b:badge(pfR(s.pf))},
+    {label:'平均風報比', val:s.wins?'1 : '+s.avgWin.toFixed(2):'N/A', cls:s.wins?mc(rrR(s.avgWin)):'m-default', b:s.wins?badge(rrR(s.avgWin)):''},
+    {label:'每筆期望值', val:(s.ev>=0?'+':'')+s.ev.toFixed(3)+' R', cls:mc(evR(s.ev)), b:badge(evR(s.ev))},
+    {label:'平均獲利', val:s.wins?'+'+s.avgWin.toFixed(2)+' R':'N/A', cls:'m-green', b:''},
+    {label:'平均虧損', val:s.losses?'-'+s.avgLoss.toFixed(2)+' R':'N/A', cls:'m-red', b:''},
+    {label:'最大單筆獲利', val:s.wins?'+'+Math.max(...getFiltered().filter(t=>t.result==='win').map(t=>t.r)).toFixed(2)+' R':'N/A', cls:'m-teal', b:''},
+    {label:'最大單筆虧損', val:s.losses?Math.min(...getFiltered().filter(t=>t.result==='loss').map(t=>t.r)).toFixed(2)+' R':'N/A', cls:'m-red', b:''},
+  ].map(m=>`<div class="metric-card"><div class="m-label">${m.label}</div><div class="m-val ${m.cls}">${m.val}</div>${m.b}</div>`).join('');
+}
+
+function renderBench(s) {
+  const t = document.getElementById('bench-table');
+  if (!s) { t.innerHTML=''; return; }
+  const pf = s.pf>=100?'∞':s.pf.toFixed(2);
+  t.innerHTML=`<thead><tr><th>指標</th><th>你的數值</th><th class="td-poor">待改善</th><th class="td-ok">普通</th><th class="td-good">好</th><th class="td-great">很好</th></tr></thead>
+  <tbody>
+    <tr><td class="td-hi">每筆期望值</td><td class="${tc(evR(s.ev))}">${(s.ev>=0?'+':'')+s.ev.toFixed(3)} R</td><td class="td-poor">&lt; 0R</td><td class="td-ok">0 ～ +0.1R</td><td class="td-good">+0.1 ～ +0.3R</td><td class="td-great">&gt; +0.3R</td></tr>
+    <tr><td class="td-hi">Profit Factor</td><td class="${tc(pfR(s.pf))}">${pf}</td><td class="td-poor">&lt; 1.25</td><td class="td-ok">1.25 ～ 1.75</td><td class="td-good">1.75 ～ 2.5</td><td class="td-great">&gt; 2.5</td></tr>
+    <tr><td class="td-hi">平均風報比</td><td class="${s.wins?tc(rrR(s.avgWin)):''}">1 : ${s.avgWin.toFixed(2)}</td><td class="td-poor">&lt; 1.5</td><td class="td-ok">1.5 ～ 2.0</td><td class="td-good">2.0 ～ 3.0</td><td class="td-great">&gt; 3.0</td></tr>
+    <tr><td class="td-hi">勝率</td><td class="${tc(wrR(s.winRate))}">${(s.winRate*100).toFixed(1)}%</td><td class="td-poor">&lt; 25%</td><td class="td-ok">25 ～ 35%</td><td class="td-good">35 ～ 50%</td><td class="td-great">&gt; 50%</td></tr>
+  </tbody>`;
+}
+
+function destroyChart(id){if(charts[id]){charts[id].destroy();delete charts[id];}}
+
+function renderCharts(data, s) {
+  destroyChart('equity'); destroyChart('dist');
+
+  // Equity curve - sorted by date, cumulative R
+  const sorted = [...data].sort((a,b)=>a.date.localeCompare(b.date));
+  let cum=0; const eq=[{x:'開始',y:0}];
+  sorted.forEach(t=>{cum=parseFloat((cum+t.r).toFixed(4));eq.push({x:t.date,y:cum});});
+  const isPos = !s || s.totalR>=0;
+
+  const eqCtx = document.getElementById('chart-equity');
+  charts['equity'] = new Chart(eqCtx,{
+    type:'line',
+    data:{datasets:[{data:eq,borderColor:isPos?'#16a34a':'#dc2626',borderWidth:2,pointRadius:eq.length<=30?3:0,pointBackgroundColor:isPos?'#16a34a':'#dc2626',fill:true,backgroundColor:isPos?'rgba(22,163,74,0.07)':'rgba(220,38,38,0.07)',tension:0.2}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{title:c=>c[0].raw.x,label:c=>` 累積：${c.raw.y>=0?'+':''}${c.raw.y} R`}}},
+      scales:{x:{type:'category',grid:{display:false},ticks:{color:'#9a9890',font:{size:10},maxTicksLimit:10}},y:{grid:{color:'rgba(0,0,0,0.05)'},ticks:{color:'#9a9890',font:{size:10},callback:v=>(v>=0?'+':'')+v+'R'}}}}
+  });
+
+  // Dist doughnut
+  if (s) {
+    const distCtx = document.getElementById('chart-dist');
+    charts['dist'] = new Chart(distCtx,{
+      type:'doughnut',
+      data:{labels:['獲利','保本','虧損'],datasets:[{data:[s.wins,s.bes,s.losses],backgroundColor:['#16a34a','#2563eb','#dc2626'],borderWidth:0,hoverOffset:4}]},
+      options:{responsive:true,maintainAspectRatio:false,cutout:'62%',
+        plugins:{legend:{display:true,position:'bottom',labels:{color:'#9a9890',font:{size:11},boxWidth:10,padding:14}},
+          tooltip:{callbacks:{label:c=>` ${c.label}: ${c.parsed}筆 (${s.total?(c.parsed/s.total*100).toFixed(1):0}%)`}}}}
+    });
+  }
+}
+
+function renderTable(data) {
+  document.getElementById('trade-count-label').textContent = `交易記錄（共 ${data.length} 筆）`;
+  const tbody = document.getElementById('trade-tbody');
+  if (!data.length) {
+    tbody.innerHTML = '<tr><td colspan="11" class="empty-state">尚無符合條件的交易記錄，點擊右上角「＋ 新增交易」開始記錄</td></tr>';
+    return;
+  }
+  const sorted = [...data].sort((a,b)=>b.date.localeCompare(a.date));
+  tbody.innerHTML = sorted.map(t => {
+    const rCls = t.r>0?'r-pos':t.r<0?'r-neg':'r-zero';
+    const rStr = (t.r>0?'+':'')+t.r.toFixed(2)+'R';
+    const usdStr = (t.usd>0?'+$':t.usd<0?'-$':'$')+Math.abs(t.usd).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+    const usdCls = t.usd>0?'r-pos':t.usd<0?'r-neg':'r-zero';
+    const resultMap={win:'<span class="pill pill-win">獲利</span>',be:'<span class="pill pill-be">保本</span>',loss:'<span class="pill pill-loss">虧損</span>'};
+    const sopPill = t.sop==='yes'?'<span class="pill pill-sop">符合</span>':'<span class="pill pill-nosop">不符合</span>';
+    const hasNotes = !!(t.notes && t.notes.trim());
+    const notesBtn = hasNotes
+      ? `<button class="btn-notes" title="展開總結反省" onclick="toggleNotes('${t.id}')">📝</button>`
+      : `<span style="color:var(--text3);font-size:11px;">—</span>`;
+    const notesRow = hasNotes
+      ? `<tr class="notes-row" id="notes-row-${t.id}" style="display:none;">
+           <td colspan="11">
+             <div class="notes-label">總結反省</div>
+             <div class="notes-content">${t.notes.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+           </td>
+         </tr>`
+      : '';
+    return `<tr>
+      <td style="color:var(--text2);">${t.date}</td>
+      <td style="color:var(--text3);font-family:'JetBrains Mono',monospace;font-size:11px;">${t.time||'—'}</td>
+      <td style="font-weight:500;color:var(--text);font-family:'JetBrains Mono',monospace;">${t.symbol}</td>
+      <td style="color:var(--text3);">${t.tf}</td>
+      <td style="color:var(--text2);">${t.strat}</td>
+      <td>${resultMap[t.result]||t.result}</td>
+      <td>${sopPill}</td>
+      <td class="${rCls}">${rStr}</td>
+      <td class="${usdCls}">${usdStr}</td>
+      <td>${notesBtn}</td>
+      <td><button class="act-btn" title="編輯" onclick="openModal('${t.id}')">✎</button><button class="act-btn" title="刪除" onclick="deleteTrade('${t.id}')">×</button></td>
+    </tr>${notesRow}`;
+  }).join('');
+}
+
+function toggleNotes(id) {
+  const row = document.getElementById('notes-row-' + id);
+  if (!row) return;
+  const opening = row.style.display === 'none';
+  row.style.display = opening ? 'table-row' : 'none';
+  const btn = document.querySelector(`button[onclick="toggleNotes('${id}')"]`);
+  if (btn) btn.textContent = opening ? '📝▲' : '📝';
+}
+
+// ── Export CSV ────────────────────────────────────────
+function exportCSV() {
+  const data = getFiltered();
+  if (!data.length) { alert('沒有可匯出的數據'); return; }
+  const rows = [['日期','標的','週期','策略','結果','SOP','損益R','損益USD']];
+  data.sort((a,b)=>a.date.localeCompare(b.date)).forEach(t=>{
+    rows.push([t.date,t.symbol,t.tf,t.strat,{win:'獲利',be:'保本',loss:'虧損'}[t.result],t.sop==='yes'?'符合':'不符合',t.r,t.usd]);
+  });
+  const csv = rows.map(r=>r.join(',')).join('\n');
+  const blob = new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download='trades.csv'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── Clear all ─────────────────────────────────────────
+function clearAll() {
+  if (!confirm('確定要清除所有交易記錄嗎？此操作無法復原。')) return;
+  trades = [];
+  localStorage.removeItem(STORAGE_KEY);
+  render();
+}
+
+// ── Import CSV ───────────────────────────────────────
+function importCSV(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const text = e.target.result.replace(/^\uFEFF/, ''); // strip BOM
+      const rows = parseCSV(text);
+      if (rows.length < 2) { alert('CSV 檔案沒有資料列'); return; }
+
+      const headers = rows[0];
+      let imported = 0, skipped = 0, errors = [];
+
+      for (let i = 1; i < rows.length; i++) {
+        const r = rows[i];
+        if (r.length < 8) { skipped++; continue; }
+
+        // B col(1): result mapping
+        const resultRaw = (r[1]||'').trim();
+        let result = '';
+        if (resultRaw.includes('成功') || resultRaw.includes('走勢達')) result = 'win';
+        else if (resultRaw.includes('打平') || resultRaw.includes('<1R')) result = 'be';
+        else if (resultRaw.includes('失敗')) result = 'loss';
+        else { skipped++; continue; }
+
+        // C col(2): SOP
+        const sopRaw = (r[2]||'').trim();
+        const sop = sopRaw === '是' ? 'yes' : sopRaw === '否' ? 'no' : '';
+        if (!sop) { skipped++; continue; }
+
+        // D col(3): symbol
+        const symbol = (r[3]||'').trim().toUpperCase();
+        if (!symbol) { skipped++; continue; }
+
+        // F col(5): timeframe
+        const tfRaw = (r[5]||'').trim();
+        let tf = '1h';
+        if (tfRaw.includes('15')) tf = '15m';
+        else if (tfRaw.includes('30')) tf = '30m';
+        else if (tfRaw.includes('2 hour') || tfRaw.includes('2h')) tf = '2h';
+        else if (tfRaw.includes('1 hour') || tfRaw.includes('1h')) tf = '1h';
+
+        // G col(6): strategy
+        const strat = (r[6]||'').trim() || '三均線多頭排列壓縮';
+
+        // H col(7): date+time — parse "March 14, 2026 15:00 (GMT+7)" or "March 14, 2026"
+        const dateRaw = (r[7]||'').trim();
+        let date = '', time = '';
+        const dm = dateRaw.match(/([A-Za-z]+)\s+(\d+),\s*(\d{4})/);
+        if (dm) {
+          const months = {January:'01',February:'02',March:'03',April:'04',May:'05',June:'06',
+            July:'07',August:'08',September:'09',October:'10',November:'11',December:'12'};
+          const mm = months[dm[1]] || '01';
+          const dd = String(parseInt(dm[2])).padStart(2,'0');
+          date = dm[3]+'-'+mm+'-'+dd;
+          // parse time e.g. "15:00" or "9:00" or "10:15"
+          const tm = dateRaw.match(/(\d{1,2}):(\d{2})\s*\(GMT/);
+          if (tm) {
+            const hh = String(parseInt(tm[1])).padStart(2,'0');
+            time = hh + ':' + tm[2];
+          }
+        }
+        if (!date) { skipped++; errors.push('Row '+(i+1)+': 無法解析日期 '+dateRaw); continue; }
+
+        // J col(9): R
+        const rRaw = (r[9]||'').trim();
+        const rVal = rRaw === '' ? 0 : parseFloat(rRaw);
+        if (isNaN(rVal)) { skipped++; continue; }
+
+        // K col(10): USD — strip $ and commas
+        const usdRaw = (r[10]||'').trim().replace(/[$,]/g,'');
+        const usdVal = usdRaw === '' ? 0 : parseFloat(usdRaw);
+        if (isNaN(usdVal)) { skipped++; continue; }
+
+        // Check duplicate by date+symbol+r
+        const isDup = trades.some(t => t.date===date && t.symbol===symbol && t.r===rVal);
+        if (isDup) { skipped++; continue; }
+
+        // N col(13): 總結反省
+        const notes = (r[13]||'').trim();
+
+        trades.push({
+          id: Date.now().toString() + '_' + i,
+          date, time, symbol, result, sop, tf, strat, r: rVal, usd: usdVal, notes
+        });
+        imported++;
+      }
+
+      trades.sort((a,b) => a.date.localeCompare(b.date));
+      save();
+      render();
+
+      let msg = `匯入完成：成功 ${imported} 筆，跳過 ${skipped} 筆`;
+      if (errors.length) msg += '\n\n注意：\n' + errors.slice(0,5).join('\n');
+      alert(msg);
+    } catch(err) {
+      alert('CSV 解析失敗：' + err.message);
+    }
+    input.value = ''; // reset so same file can be re-uploaded
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+function parseCSV(text) {
+  const rows = [];
+  let row = [], cell = '', inQ = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i], n = text[i+1];
+    if (inQ) {
+      if (c === '"' && n === '"') { cell += '"'; i++; }
+      else if (c === '"') { inQ = false; }
+      else { cell += c; }
+    } else {
+      if (c === '"') { inQ = true; }
+      else if (c === ',') { row.push(cell); cell = ''; }
+      else if (c === '\r' && n === '\n') { row.push(cell); rows.push(row); row=[]; cell=''; i++; }
+      else if (c === '\n' || c === '\r') { row.push(cell); rows.push(row); row=[]; cell=''; }
+      else { cell += c; }
+    }
+  }
+  if (cell || row.length) { row.push(cell); rows.push(row); }
+  return rows.filter(r => r.some(c => c.trim()));
+}
+
+// ── Init ──────────────────────────────────────────────
+['f-start','f-end','f-result','f-tf','f-strat','f-sop','f-session'].forEach(id=>{
+  document.getElementById(id).addEventListener('change', render);
+});
+
+load();
+
+// Load sample data if empty
+if (!trades.length) {
+  const samples = [
+    {id:'s1',date:'2025-07-05',symbol:'BTCUSDT',result:'loss',sop:'yes',tf:'1h',strat:'三均線多頭排列壓縮',r:-1,usd:-60},
+    {id:'s2',date:'2025-07-12',symbol:'ETHUSDT',result:'loss',sop:'yes',tf:'2h',strat:'三均線收斂至一點',r:-1,usd:-60},
+    {id:'s3',date:'2025-08-03',symbol:'SOLUSDT',result:'win',sop:'yes',tf:'1h',strat:'三均線多頭排列壓縮',r:2.5,usd:150},
+    {id:'s4',date:'2025-09-15',symbol:'BTCUSDT',result:'be',sop:'yes',tf:'2h',strat:'三均線多頭排列壓縮',r:0,usd:0},
+    {id:'s5',date:'2025-10-20',symbol:'BNBUSDT',result:'win',sop:'yes',tf:'1h',strat:'三均線收斂至一點',r:10,usd:600},
+  ];
+  trades = samples;
+}
+
+render();
+</script>
+</body>
+</html>
